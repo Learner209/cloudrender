@@ -8,7 +8,7 @@ import os
 import json
 import smplpytorch
 from cloudrender.render import SimplePointcloud, DirectionalLight
-from cloudrender.render.smpl import AnimatableSMPLModel
+from cloudrender.render.smpl_legacy import AnimatableSMPLModel
 from cloudrender.camera import PerspectiveCameraModel
 from cloudrender.camera.trajectory import Trajectory
 from cloudrender.scene import Scene
@@ -17,10 +17,14 @@ from videoio import VideoWriter
 from OpenGL import GL as gl
 from tqdm import tqdm
 from cloudrender.utils import trimesh_load_from_zip, load_hps_sequence
+from egoallo import training_utils
+from egoallo.scripts import train
 
 logger = logging.getLogger("main_script")
 logger.setLevel(logging.INFO)
 
+
+training_utils.ipdb_safety_net()
 
 # This example shows how to:
 # - render pointcloud
@@ -106,7 +110,7 @@ logger.info("Loading SMPL animation")
 # Make sure to fix the typo for male model while unpacking SMPL .pkl files:
 # basicmodel_m_lbs_10_207_0_v1.0.0.pkl -> basicModel_m_lbs_10_207_0_v1.0.0.pkl
 renderable_smpl = AnimatableSMPLModel(camera=camera, gender="male",
-    smpl_root=os.path.join(os.path.dirname(smplpytorch.__file__), "native/models"))
+    smpl_root="/home/minghao/src/robotflow/egoallo/assets/smpl_based_model")
 # Turn off shadow drawing for SMPL model, as self-shadowing produces artifacts usually
 renderable_smpl.draw_shadows = False
 renderable_smpl.init_context()
