@@ -76,12 +76,14 @@ class HPSPathManipulator:
         path = self.assets_dir / "smpl_based_model"
         return path
         
-    def load_camera_trajectory(self, sequence_name: str) -> dict:
+    def load_camera_trajectory(self, sequence_name: str, fps: float) -> tuple[list[dict[str, float]], float, float]:
         """Load and parse camera trajectory file."""
         path = self.get_camera_path(sequence_name)
         path_json = json.load(open(path))
         path_json = {int(k): {**v, "time": float(k)/fps} for k, v in path_json.items() if v is not None}
-        return list(path_json.values())
+        first_key, last_key = min(path_json.keys()), max(path_json.keys())
+        # return the values, video_start_time, video_end_time
+        return list(path_json.values()), path_json[first_key]["time"], path_json[last_key]["time"]
 
     def validate_paths(self, sequence_name: str, subject: str) -> bool:
         """Validate that all required files exist for a sequence."""
@@ -100,8 +102,7 @@ paths = HPSPathManipulator(base_dir="/home/minghao/src/robotflow/egoallo/dataset
 # We will use EGL offscreen rendering for that, but you can change it to whatever context you prefer (e.g. OsMesa, X-Server)
 resolution = (1280,720)
 fps = 30.
-video_start_time = 6.
-video_length_seconds = 12.
+
 logger.info("Initializing EGL and OpenGL")
 context = EGLContext()
 if not context.initialize(*resolution):
@@ -181,7 +182,7 @@ motion_seq = load_hps_sequence(
     str(paths.get_smpl_path(sequence_name)),
     str(paths.get_betas_path(subject))
 )
-renderable_smpl.set_sequence(motion_seq, default_frame_time=1/30.)
+renderable_smpl.set_sequence(motion_seq, default_frame_time=1/fps)
 renderable_smpl.set_material(0.3,1,0,0)
 main_scene.add_object(renderable_smpl)
 
@@ -198,21 +199,20 @@ smpl_model_shadowmap = main_scene.add_dirlight_with_shadow(light=light, shadowma
 # Set camera trajectory and fill in spaces between keypoints with interpolation
 logger.info("Creating camera trajectory")
 camera_trajectory = Trajectory()
-camera_trajectory_data = paths.load_camera_trajectory(sequence_name)
-# camera_trajectory.set_trajectory(json.load(open("test_assets/TRAJ_SUB4_MPI_Etage6_working_standing.json")))
+camera_trajectory_data, video_start_time, video_end_time = paths.load_camera_trajectory(sequence_name, fps)
 camera_trajectory.set_trajectory(camera_trajectory_data)
-camera_trajectory.refine_trajectory(time_step=1/30.)
+camera_trajectory.refine_trajectory(time_step=1/fps)
 
 ### Main drawing loop ###
 logger.info("Running the main drawing loop")
 # Create a video writer to dump frames to and an async capturing controller
-with VideoWriter("test_assets/output.mp4", resolution=resolution, fps=fps) as vw, \
+with VideoWriter("test_assets/output_1.mp4", resolution=resolution, fps=fps) as vw, \
         AsyncPBOCapture(resolution, queue_size=50) as capturing:
-    for current_time in tqdm(np.arange(video_start_time, video_start_time+video_length_seconds, 1/fps)):
+    for current_time in tqdm(np.arange(video_start_time, video_end_time, 1/fps)):
         # Update dynamic objects
         renderable_smpl.set_time(current_time)
         smpl_model_shadowmap.camera.init_extrinsics(
-            pose=renderable_smpl.translation_params.cpu().numpy()+smpl_model_shadowmap_offset)
+            pose=renderable_smpl.translation_params.cpu().numpy()-smpl_model_shadowmap_offset)
         # Move the camera along the trajectory
         camera_trajectory.apply(camera, current_time)
         # Clear OpenGL buffers
