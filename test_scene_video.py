@@ -18,8 +18,8 @@ from OpenGL import GL as gl
 from tqdm import tqdm
 from cloudrender.utils import trimesh_load_from_zip, load_hps_sequence
 from egoallo import training_utils
-from egoallo.scripts import train
-
+from pathlib import Path
+from typing import Optional
 logger = logging.getLogger("main_script")
 logger.setLevel(logging.INFO)
 
@@ -31,7 +31,70 @@ training_utils.ipdb_safety_net()
 # - render a sequence of frames with moving SMPL mesh
 # - smoothly move the camera
 # - dump rendered frames to a video
+class HPSPathManipulator:
+    """Handles path management for HPS dataset and related assets."""
+    
+    def __init__(self, base_dir: Optional[str] = None, assets_dir: Optional[str] = None):
+        # Allow override via environment variables or parameters
+        self.base_dir = Path(base_dir or os.getenv(
+            'EGOALLO_DATA_DIR',
+            '/home/minghao/src/robotflow/egoallo/datasets/HPS'
+        ))
+        self.assets_dir = Path(assets_dir or os.getenv(
+            'EGOALLO_ASSETS_DIR',
+            '/home/minghao/src/robotflow/egoallo/assets'
+        ))
+        
+        # Validate paths exist
+        if not self.base_dir.exists():
+            raise FileNotFoundError(f"Dataset directory not found: {self.base_dir}")
+        if not self.assets_dir.exists():
+            raise FileNotFoundError(f"Assets directory not found: {self.assets_dir}")
+            
+    def get_scan_path(self, scan_name: str) -> Path:
+        """Get path to a pointcloud scan file."""
+        path = self.base_dir / 'scans' / f"{scan_name}.zip"
+        return path
 
+    def get_smpl_path(self, sequence_name: str) -> Path:
+        """Get path to SMPL sequence file."""
+        path = self.base_dir / 'hps_smpl' / f"{sequence_name}.pkl"
+        return path
+        
+    def get_betas_path(self, subject: str) -> Path:
+        """Get path to subject betas file."""
+        path = self.base_dir / 'hps_betas' / f"{subject}.json"
+        return path
+        
+    def get_camera_path(self, sequence_name: str) -> Path:
+        """Get path to camera localization file."""
+        path = self.base_dir / 'head_camera_localizations' / f"{sequence_name}.json"
+        return path
+        
+    def get_smpl_model_path(self, gender: str = "male") -> Path:
+        """Get path to SMPL model assets."""
+        path = self.assets_dir / "smpl_based_model"
+        return path
+        
+    def load_camera_trajectory(self, sequence_name: str) -> dict:
+        """Load and parse camera trajectory file."""
+        path = self.get_camera_path(sequence_name)
+        path_json = json.load(open(path))
+        path_json = {int(k): {**v, "time": float(k)/fps} for k, v in path_json.items() if v is not None}
+        return list(path_json.values())
+
+    def validate_paths(self, sequence_name: str, subject: str) -> bool:
+        """Validate that all required files exist for a sequence."""
+        paths = [
+            self.get_smpl_path(sequence_name),
+            self.get_betas_path(subject),
+            self.get_camera_path(sequence_name)
+        ]
+        return all(p.exists() for p in paths)
+
+# Initialize path manager
+paths = HPSPathManipulator(base_dir="/home/minghao/src/robotflow/egoallo/datasets/HPS",
+                           assets_dir="/home/minghao/src/robotflow/egoallo/assets")
 
 # First, let's set the target resolution, framerate, video length and initialize OpenGL context.
 # We will use EGL offscreen rendering for that, but you can change it to whatever context you prefer (e.g. OsMesa, X-Server)
@@ -96,34 +159,34 @@ main_scene = Scene()
 # Load pointcloud
 logger.info("Loading pointcloud")
 renderable_pc = SimplePointcloud(camera=camera)
-# Turn off shadow generation from pointcloud
 renderable_pc.generate_shadows = False
 renderable_pc.init_context()
-pointcloud = trimesh_load_from_zip("test_assets/MPI_Etage6.zip", "*/pointcloud.ply")
+pointcloud = trimesh_load_from_zip(str(paths.get_scan_path("MPI_KINO")), "*/pointcloud.ply")
 renderable_pc.set_buffers(pointcloud)
 main_scene.add_object(renderable_pc)
 
-
 # Load human motion
 logger.info("Loading SMPL animation")
-# set different smpl_root to SMPL .pkl files folder if needed
-# Make sure to fix the typo for male model while unpacking SMPL .pkl files:
-# basicmodel_m_lbs_10_207_0_v1.0.0.pkl -> basicModel_m_lbs_10_207_0_v1.0.0.pkl
-renderable_smpl = AnimatableSMPLModel(camera=camera, gender="male",
-    smpl_root="/home/minghao/src/robotflow/egoallo/assets/smpl_based_model")
-# Turn off shadow drawing for SMPL model, as self-shadowing produces artifacts usually
+renderable_smpl = AnimatableSMPLModel(
+    camera=camera, 
+    gender="male",
+    smpl_root=str(paths.get_smpl_model_path())
+)
 renderable_smpl.draw_shadows = False
 renderable_smpl.init_context()
-motion_seq = load_hps_sequence("test_assets/SUB4_MPI_Etage6_working_standing.pkl", "test_assets/SUB4.json")
+
+sequence_name = "SUB3_MPI_KINO_lecture_multilevel"
+subject = "SUB3"
+motion_seq = load_hps_sequence(
+    str(paths.get_smpl_path(sequence_name)),
+    str(paths.get_betas_path(subject))
+)
 renderable_smpl.set_sequence(motion_seq, default_frame_time=1/30.)
-# Let's set diffuse material for SMPL model
 renderable_smpl.set_material(0.3,1,0,0)
 main_scene.add_object(renderable_smpl)
 
-
 # Let's add a directional light with shadows for this scene
 light = DirectionalLight(np.array([0., -1., -1.]), np.array([0.8, 0.8, 0.8]))
-
 
 # We'll create a 4x4x10 meter shadowmap with 1024x1024 texture buffer and center it above the model along the direction
 # of the light. We will move the shadomap with the model in the main loop
@@ -132,13 +195,13 @@ smpl_model_shadowmap = main_scene.add_dirlight_with_shadow(light=light, shadowma
                                     shadowmap_worldsize=(4.,4.,10.),
                                     shadowmap_center=motion_seq[0]['translation']+smpl_model_shadowmap_offset)
 
-
 # Set camera trajectory and fill in spaces between keypoints with interpolation
 logger.info("Creating camera trajectory")
 camera_trajectory = Trajectory()
-camera_trajectory.set_trajectory(json.load(open("test_assets/TRAJ_SUB4_MPI_Etage6_working_standing.json")))
+camera_trajectory_data = paths.load_camera_trajectory(sequence_name)
+# camera_trajectory.set_trajectory(json.load(open("test_assets/TRAJ_SUB4_MPI_Etage6_working_standing.json")))
+camera_trajectory.set_trajectory(camera_trajectory_data)
 camera_trajectory.refine_trajectory(time_step=1/30.)
-
 
 ### Main drawing loop ###
 logger.info("Running the main drawing loop")
