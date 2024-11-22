@@ -23,6 +23,12 @@ class BaseCameraModel(ABC):
         self.world2cam = False
 
     def init_extrinsics(self, quat=None, pose=None, world2cam=False):
+        """
+        Args:
+            quat (np.ndarray): quaternion, shape (4,), in (wxyz) order
+            pose (np.ndarray): translation, shape (3,)
+            world2cam (bool): if True, the transformation is from world to camera, otherwise from camera to world
+        """
         quat = self.quat if quat is None else quat
         pose = self.pose if pose is None else pose
         self.quat = quat

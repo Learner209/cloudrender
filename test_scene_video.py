@@ -20,6 +20,8 @@ from cloudrender.utils import trimesh_load_from_zip, load_hps_sequence
 from egoallo import training_utils
 from pathlib import Path
 from typing import Optional
+from egoallo.transforms import SO3, SE3
+import torch
 logger = logging.getLogger("main_script")
 logger.setLevel(logging.INFO)
 
@@ -152,7 +154,8 @@ gl.glDepthRange(0.0, 1.0)
 # Create and set a position of the camera
 camera = PerspectiveCameraModel()
 camera.init_intrinsics(resolution, fov=75, far=50)
-camera.init_extrinsics(np.array([1,np.pi/5,0,0]), np.array([0,-1,2]))
+# camera.init_extrinsics(np.array([1,np.pi/5,0,0]), np.array([0,-1,2]))
+camera.init_extrinsics(np.array([1,0,np.pi/5,0]), np.array([0,1,0]))
 
 # Create a scene
 main_scene = Scene()
@@ -176,8 +179,8 @@ renderable_smpl = AnimatableSMPLModel(
 renderable_smpl.draw_shadows = False
 renderable_smpl.init_context()
 
-sequence_name = "SUB3_MPI_KINO_lecture_multilevel"
-subject = "SUB3"
+sequence_name = "SUB4_MPI_Etage6_working_standing"
+subject = "SUB4"
 motion_seq = load_hps_sequence(
     str(paths.get_smpl_path(sequence_name)),
     str(paths.get_betas_path(subject))
@@ -187,7 +190,8 @@ renderable_smpl.set_material(0.3,1,0,0)
 main_scene.add_object(renderable_smpl)
 
 # Let's add a directional light with shadows for this scene
-light = DirectionalLight(np.array([0., -1., -1.]), np.array([0.8, 0.8, 0.8]))
+# light = DirectionalLight(np.array([0., -1., -1.]), np.array([0.8, 0.8, 0.8]))
+light = DirectionalLight(np.array([0., 0., -1.]), np.array([0.8, 0.8, 0.8]))
 
 # We'll create a 4x4x10 meter shadowmap with 1024x1024 texture buffer and center it above the model along the direction
 # of the light. We will move the shadomap with the model in the main loop
@@ -205,27 +209,77 @@ camera_trajectory.refine_trajectory(time_step=1/fps)
 
 ### Main drawing loop ###
 logger.info("Running the main drawing loop")
+# video_start_time = 6.
+# video_end_time = 6 + 12.
 # Create a video writer to dump frames to and an async capturing controller
 with VideoWriter("test_assets/output_1.mp4", resolution=resolution, fps=fps) as vw, \
         AsyncPBOCapture(resolution, queue_size=50) as capturing:
     for current_time in tqdm(np.arange(video_start_time, video_end_time, 1/fps)):
         # Update dynamic objects
         renderable_smpl.set_time(current_time)
+        current_smpl_params = renderable_smpl.params_sequence[renderable_smpl.current_sequence_frame_ind]
+        cur_smpl_trans, cur_smpl_shape, cur_smpl_pose = current_smpl_params['translation'], current_smpl_params['shape'], current_smpl_params['pose']
+        
+        # Update shadow map position
         smpl_model_shadowmap.camera.init_extrinsics(
-            pose=renderable_smpl.translation_params.cpu().numpy()-smpl_model_shadowmap_offset)
-        # Move the camera along the trajectory
-        camera_trajectory.apply(camera, current_time)
+            pose=cur_smpl_trans+smpl_model_shadowmap_offset)
+
+        # Calculate camera position relative to SMPL model
+        # Keep camera at fixed distance and height from model
+        distance = 2.0  # Distance from model
+        height = 0.8    # Height above model
+        angle = current_time * 0.5  # Rotate around model over time
+        
+        # Calculate camera position in world coordinates
+        smpl_pos = torch.from_numpy(cur_smpl_trans).float()
+        camera_offset = torch.tensor([
+            distance * np.cos(angle),
+            distance * np.sin(angle),
+            height
+        ])
+        camera_pos = smpl_pos + camera_offset
+        
+        # Make camera look at SMPL model
+        look_dir = smpl_pos - camera_pos
+        look_dir = look_dir / torch.norm(look_dir)
+        
+        # Calculate up vector (always pointing up in z direction)
+        up = torch.tensor([0.0, 0.0, 1.0], dtype=torch.float64)
+        
+        # Calculate right vector
+        right = torch.cross(look_dir, up, dim=-1)
+        right = right / torch.norm(right)
+        
+        # Recalculate up to ensure orthogonality
+        up = torch.cross(right, look_dir)
+        
+        # Create rotation matrix
+        rot_matrix = torch.stack([right, up, -look_dir], dim=1)
+        
+        # Convert to SO3 and SE3
+        rotation = SO3.from_matrix(rot_matrix)
+        transform = SE3.from_rotation_and_translation(rotation, camera_pos)
+        
+        # Apply transform to camera
+        pose = transform.translation().numpy(force=True)
+        quat = transform.rotation().wxyz.numpy(force=True)
+        camera.init_extrinsics(quat, pose)
+
         # Clear OpenGL buffers
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+        
         # Draw the scene
         main_scene.draw()
+        
         # Request color readout; optionally receive previous request
         gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, _main_fb)
         gl.glReadBuffer(gl.GL_COLOR_ATTACHMENT0)
         color = capturing.request_color_async()
+        
         # If received the previous frame, write it to the video
         if color is not None:
             vw.write(color)
+            
     # Flush the remaining frames
     logger.info("Flushing PBO queue")
     color = capturing.get_first_requested_color()
