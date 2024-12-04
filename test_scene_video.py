@@ -18,11 +18,14 @@ from OpenGL import GL as gl
 from tqdm import tqdm
 from cloudrender.utils import trimesh_load_from_zip, load_hps_sequence
 from egoallo import training_utils
-from egoallo.scripts import train
 
 logger = logging.getLogger("main_script")
 logger.setLevel(logging.INFO)
 
+import inspect
+
+if not hasattr(inspect, 'getargspec'):
+    inspect.getargspec = inspect.getfullargspec
 
 training_utils.ipdb_safety_net()
 
@@ -99,7 +102,7 @@ renderable_pc = SimplePointcloud(camera=camera)
 # Turn off shadow generation from pointcloud
 renderable_pc.generate_shadows = False
 renderable_pc.init_context()
-pointcloud = trimesh_load_from_zip("test_assets/MPI_Etage6.zip", "*/pointcloud.ply")
+pointcloud = trimesh_load_from_zip("./assets/cloudrender/test_assets/MPI_Etage6.zip", "*/pointcloud.ply")
 renderable_pc.set_buffers(pointcloud)
 main_scene.add_object(renderable_pc)
 
@@ -114,7 +117,7 @@ renderable_smpl = AnimatableSMPLModel(camera=camera, gender="male",
 # Turn off shadow drawing for SMPL model, as self-shadowing produces artifacts usually
 renderable_smpl.draw_shadows = False
 renderable_smpl.init_context()
-motion_seq = load_hps_sequence("test_assets/SUB4_MPI_Etage6_working_standing.pkl", "test_assets/SUB4.json")
+motion_seq = load_hps_sequence("./assets/cloudrender/test_assets/SUB4_MPI_Etage6_working_standing.pkl", "./assets/cloudrender/test_assets/SUB4.json")
 renderable_smpl.set_sequence(motion_seq, default_frame_time=1/30.)
 # Let's set diffuse material for SMPL model
 renderable_smpl.set_material(0.3,1,0,0)
@@ -136,14 +139,14 @@ smpl_model_shadowmap = main_scene.add_dirlight_with_shadow(light=light, shadowma
 # Set camera trajectory and fill in spaces between keypoints with interpolation
 logger.info("Creating camera trajectory")
 camera_trajectory = Trajectory()
-camera_trajectory.set_trajectory(json.load(open("test_assets/TRAJ_SUB4_MPI_Etage6_working_standing.json")))
+camera_trajectory.set_trajectory(json.load(open("./assets/cloudrender/test_assets/TRAJ_SUB4_MPI_Etage6_working_standing.json")))
 camera_trajectory.refine_trajectory(time_step=1/30.)
 
 
 ### Main drawing loop ###
 logger.info("Running the main drawing loop")
 # Create a video writer to dump frames to and an async capturing controller
-with VideoWriter("test_assets/output.mp4", resolution=resolution, fps=fps) as vw, \
+with VideoWriter("./assets/cloudrender/test_assets/output.mp4", resolution=resolution, fps=fps) as vw, \
         AsyncPBOCapture(resolution, queue_size=50) as capturing:
     for current_time in tqdm(np.arange(video_start_time, video_start_time+video_length_seconds, 1/fps)):
         # Update dynamic objects
