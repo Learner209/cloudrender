@@ -135,11 +135,16 @@ class SimplePointcloud(Pointcloud):
         return self.context.splat_size
 
     def _upload_uniforms(self, shader_ids, lights=(), shadowmaps=()):
+        # NOTE: splat_size determines how large each individua point appears when rendered. It essentially controls the radius or diameter of each rendered point.
         gl.glUniform1f(shader_ids['splat_size'], self.context.splat_size)
         shadowmaps_enabled = np.zeros(self.SHADOWMAPS_MAX, dtype=np.int32)
         shadowmaps_enabled[:len(shadowmaps)] = 1
         M = self.context.Model
+        # NOTE: light_VP is the light's view-projection matrix, which transforms vertices from world space to light space.
+        # ! M is the model matrix, which transforms vertices from object space to world space.
         shadowmaps_lightMVP = [np.array(s.light_VP * M) for s in shadowmaps]
+        # NOTE: the overlay color is an RGBA color value that gets applied on top of the base PC colors, allowing for tinting or highlighting effects.
+        # the  `hsv_multiplier` is (hue, saturation, value) multiplier for the PC colors, allowing for color manipulation.
         shadowmaps_lightMVP = np.array(shadowmaps_lightMVP, dtype='f4')
         gl.glUniform4f(self.context.shader_ids['overlay_color'], *(self.overlay_color.astype(np.float32) / 255.))
         gl.glUniform3f(self.context.shader_ids['hsv_multiplier'], *self.hsv_multiplier)

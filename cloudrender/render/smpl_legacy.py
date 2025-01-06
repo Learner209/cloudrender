@@ -8,6 +8,10 @@ from .utils import MeshNorms
 
 
 class SMPLModel(SimpleMesh):
+    """
+    SMPL model with vertex normals.
+    NOTE: `_set_buffers` and `_update_buffers` are overridden to use `MeshContainer` with vertex normals.
+    """
     def __init__(self, device=None, smpl_root=None, template=None, gender="neutral", model_type="smpl", global_offset=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.color = None
@@ -70,6 +74,9 @@ class SMPLModel(SimpleMesh):
         self.vertex_colors = np.tile(np.array(color, dtype=np.uint8).reshape(1, 4), (self.nglverts, 1))
 
     def get_smpl(self, pose_params=None, shape_params=None, translation_params=None):
+        """
+        NOTE: update internal attrs like pose-params, shape_params, translation_params, and run SMPL forward.
+        """
         self.update_params(pose_params, shape_params, translation_params)
         batch_pose_params = self.pose_params.unsqueeze(0)
         batch_shape_params = self.shape_params.unsqueeze(0)
@@ -78,6 +85,7 @@ class SMPLModel(SimpleMesh):
         output = self.model_layer(global_orient =batch_pose_params[:, :3],
                                   body_pose=batch_pose_params[:,3:], betas=batch_shape_params)
         verts = output.vertices
+        # NOTE: normals are inherited from face normals, and arrange them in the order of vertex count. so the `len(normals)` is the same as `len(faces)`.
         normals = self.normals_layer.vertices_norms(verts.squeeze(0))
         return verts.squeeze(0) + self.translation_params.unsqueeze(0), normals
 

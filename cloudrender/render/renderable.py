@@ -15,6 +15,9 @@ class Renderable:
     LIGHTS_MAX = {"directional": 1}
 
     class GLContext(object):
+        """
+        OpenGL context for rendering.
+        """
         pass
 
     @staticmethod
@@ -138,6 +141,9 @@ class Renderable:
         self.shadowgen_shader = None
 
     def _reload_shaders(self, shader_mode: str = None):
+        """
+        Reload shaders for the current object.
+        """
         self._init_shaders(self.camera.model, shader_mode if shader_mode is not None else self.shader_mode)
         self.context.shader_ids.update(self.camera.locate_uniforms(self.shader))
         self.context.shader_ids.update(self.locate_uniforms(self.shader, ["M"]))
@@ -155,6 +161,7 @@ class Renderable:
         """
         assert self.camera is not None, "Camera must be set before context initialization"
         self.shader_mode = shader_mode
+        # NOTE: shadowgen_context is used for generating shadowmaps in a separate pass. its context and main context use different shaders, rendering states and transformations.
         self.context = self.GLContext()
         self.context.shader_ids = {}
         if self.generate_shadows:
@@ -301,6 +308,9 @@ class DynamicTimedRenderable(DynamicRenderable):
         self.current_time = 0
 
     def set_sequence(self, *args, times = None, default_frame_time: float = 1./60, **kwargs):
+        """
+        NOTE: Set the sequence for the current object, times can be unevenly spaced.
+        """
         super().set_sequence(*args, **kwargs)
         self.default_frame_time = default_frame_time
         if times is not None:

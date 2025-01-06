@@ -79,6 +79,10 @@ class SimpleMesh(Mesh):
         self.overlay_color = np.asarray(color, dtype=np.uint8)
 
     def _set_buffers(self, mesh: Union[Mesh.MeshContainer, trimesh.Trimesh]):
+        """
+        Set the buffers for the mesh. set mesh buffers pipeline: gl.glGenBuffers(), gl.glBindBuffer(), gl.glBufferData(), gl.glVertexAttribPointer(), gl.glEnableVertexAttribArray().
+        generate buffers, bind buffers to gl.GL_ARRAY_BUFFER, fill buffer with data, set up vertex attributes.
+        """
         faces = mesh.faces
         glverts = np.copy(mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order='C')
         if hasattr(mesh, "colors"):
@@ -93,6 +97,9 @@ class SimpleMesh(Mesh):
         self.context.vao = gl.glGenVertexArrays(1)
         gl.glBindVertexArray(self.context.vao)
 
+		# NOTE: GL_ARRAY_BUFFER is a gloabl binding target in opengl's state machine that reprs vert attr. Each `gl.glBindBuffer()` call makes `buffer` the active buffer..
+        # ! Only one buffer can be active per targert at a time.
+        # NOTE: gl.GL_DYNAMIC_DRAW is a performance hint that tells opengl that the buffer will be updated frequently.
         self.context.vertexbuffer = gl.glGenBuffers(1)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.vertexbuffer)
         gl.glBufferData(gl.GL_ARRAY_BUFFER, glverts.nbytes, glverts, gl.GL_DYNAMIC_DRAW)
@@ -126,6 +133,8 @@ class SimpleMesh(Mesh):
         shadowmaps_enabled = np.zeros(self.SHADOWMAPS_MAX, dtype=np.int32)
         shadowmaps_enabled[:len(shadowmaps)] = 1
         M = self.context.Model
+        # NOTE: MVP(model-view-projection) matrix is used to transform vertices from object space to screen space.
+        # iIt's created by x 3 matrices: model matrix, view matrix, projection matrix.
         shadowmaps_lightMVP = [np.array(s.light_VP * M) for s in shadowmaps]
         shadowmaps_lightMVP = np.array(shadowmaps_lightMVP, dtype='f4')
         if self.draw_shadows:
@@ -165,6 +174,10 @@ class SimpleMesh(Mesh):
         self.shader.begin()
         self.upload_uniforms(self.context.shader_ids, lights, shadowmaps)
 
+		# NOTE: gl.glEnableVertexAttribArray() enables the sending vertex data to shader attribute location n.
+        # ! gl.glVertexAttribPointer() sets up the vertex attribute pointer for the buffer bound to gl.GL_ARRAY_BUFFER, first arg (0,1,2) is the shader attr location.
+        # second arg(3,4,4) is the number of components per vertex attr. GL_FLOAT/GL_FALSE is the data_type and normalization flag.
+        # ! gl.glBindBuffer() binds the buffer to the target gl.GL_ARRAY_BUFFER.
         gl.glBindVertexArray(self.context.vao)
 
         gl.glEnableVertexAttribArray(0)
@@ -197,6 +210,12 @@ class SimpleMesh(Mesh):
         """
         self.shadowgen_shader.begin()
         self.upload_shadowgen_uniforms(shadowmap_camera, self.shadowgen_context.shader_ids)
+
+		# NOTE: gl.glBindVertexArray() binds the vertex array object to the current rendering context.
+		# ! VAO is a container for vertex attribute pointers, enabling efficient management of vertex data.
+		# ! It encapsulates the state of vertex attributes, including buffer bindings and attribute pointers.
+		# ! When a VAO is bound, the state associated with it is used for subsequent draw calls until another VAO is bound.
+		# ! This allows for efficient reuse of vertex data and attribute configurations across multiple draw calls.
 
         gl.glBindVertexArray(self.context.vao)
 
