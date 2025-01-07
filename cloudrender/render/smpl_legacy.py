@@ -8,6 +8,10 @@ from .mesh import SimpleMesh
 from .renderable import DynamicTimedRenderable
 from .utils import MeshNorms
 from egoallo.transforms import SE3, SO3
+from typing import List
+from OpenGL import GL as gl
+from .lights import Light
+from .shadowmap import ShadowMap
 
 class SMPLModel(SimpleMesh):
     """
@@ -133,6 +137,15 @@ class SMPLModel(SimpleMesh):
         mesh = self.get_smpl_mesh(pose_params, shape_params, translation_params, **kwargs)
         super()._update_buffers(mesh)
 
+    # disable depth testing and writing to depth buffer
+    # Depth writing refers to the process of writing the depth (z-value) of each fragment (pixel) to the depth buffer (also called the z-buffer). The depth buffer is a special buffer in OpenGL that stores the depth of each pixel in the scene. It is used to determine whether a fragment should be drawn or discarded based on its depth relative to other fragments.
+    # Depth Buffer: A 2D array (same size as the framebuffer) that stores the depth value of the closest fragment for each pixel.
+    # Depth Test: During rendering, OpenGL compares the depth of the current fragment with the value stored in the depth buffer. If the fragment's depth is closer (less than the stored value), it is drawn, and the depth buffer is updated. Otherwise, the fragment is discarded.
+    def _draw(self, reset: bool, lights: List[Light], shadowmaps: List[ShadowMap]) -> bool:
+        gl.glDepthMask(gl.GL_FALSE)
+        res = super()._draw(reset, lights, shadowmaps)
+        gl.glDepthMask(gl.GL_TRUE)
+        return res
 
 class AnimatableSMPLModel(SMPLModel, DynamicTimedRenderable):
     def __init__(self, *args, **kwargs):
