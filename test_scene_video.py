@@ -7,7 +7,7 @@ import sys
 import os
 import json
 import smplpytorch
-from cloudrender.render import SimplePointcloud, DirectionalLight
+from cloudrender.render import SimplePointcloud, DirectionalLight, AnimatablePointcloud
 from cloudrender.render.smpl_legacy import AnimatableSMPLModel
 from cloudrender.camera import PerspectiveCameraModel
 from cloudrender.camera.trajectory import Trajectory
@@ -169,6 +169,7 @@ pointcloud = trimesh_load_from_zip(str(paths.get_scan_path("MPI_KINO")), "*/poin
 renderable_pc.set_buffers(pointcloud)
 main_scene.add_object(renderable_pc)
 
+
 # Load human motion
 logger.info("Loading SMPL animation")
 renderable_smpl = AnimatableSMPLModel(
@@ -188,6 +189,40 @@ motion_seq = load_hps_sequence(
 renderable_smpl.set_sequence(motion_seq, default_frame_time=1/fps)
 renderable_smpl.set_material(0.3,1,0,0)
 main_scene.add_object(renderable_smpl)
+# Debug kpts that runs fk on self-cusotmized smpl model.
+debug_renderable_keypoint = AnimatablePointcloud(camera=camera)
+debug_renderable_keypoint.generate_shadows = False
+debug_renderable_keypoint.init_context()
+
+# Generate 30 keypoints around each translation point
+num_keypoints = 30
+keypoint_sequence = []
+
+for frame in motion_seq:
+    trans = frame['translation']
+    # Generate points in a sphere around the translation point
+    radius = 0.5  # 0.5m radius sphere
+    theta = np.random.uniform(0, 2*np.pi, num_keypoints)
+    phi = np.random.uniform(0, np.pi, num_keypoints)
+    r = radius * np.cbrt(np.random.uniform(0, 1, num_keypoints))
+    
+    x = trans[0] + r * np.sin(phi) * np.cos(theta)
+    y = trans[1] + r * np.sin(phi) * np.sin(theta) 
+    z = trans[2] + r * np.cos(phi)
+    
+    vertices = np.stack([x, y, z], axis=1)
+    colors = np.tile(np.array([255, 0, 0, 128], dtype=np.uint8).reshape(1, 4), 
+                    (len(vertices), 1))
+    
+    keypoint_sequence.append({
+        'vertices': vertices,
+        'colors': colors
+    })
+
+renderable_keypoint.set_sequence(keypoint_sequence, default_frame_time=1/fps)
+
+main_scene.add_object(renderable_keypoint)
+
 
 # Let's add a directional light with shadows for this scene
 # light = DirectionalLight(np.array([0., -1., -1.]), np.array([0.8, 0.8, 0.8]))
@@ -214,12 +249,18 @@ logger.info("Running the main drawing loop")
 # Create a video writer to dump frames to and an async capturing controller
 with VideoWriter("test_assets/output_1.mp4", resolution=resolution, fps=fps) as vw, \
         AsyncPBOCapture(resolution, queue_size=50) as capturing:
+    cnt = 0
     for current_time in tqdm(np.arange(video_start_time, video_end_time, 1/fps)):
+        cnt += 1
+        if cnt > 3000:
+            break
         # Update dynamic objects
         renderable_smpl.set_time(current_time)
         current_smpl_params = renderable_smpl.params_sequence[renderable_smpl.current_sequence_frame_ind]
         cur_smpl_trans, cur_smpl_shape, cur_smpl_pose = current_smpl_params['translation'], current_smpl_params['shape'], current_smpl_params['pose']
         
+        renderable_keypoint.set_time(current_time)
+
         # Update shadow map position
         smpl_model_shadowmap.camera.init_extrinsics(
             pose=cur_smpl_trans+smpl_model_shadowmap_offset)

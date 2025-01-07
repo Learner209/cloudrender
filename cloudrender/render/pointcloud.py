@@ -11,6 +11,7 @@ from OpenGL import GL as gl
 from .renderable import Renderable
 from .shaders.shader_loader import Shader
 from ..camera.models import BaseCameraModel, StandardProjectionCameraModel
+from .renderable import DynamicTimedRenderable
 from .shadowmap import ShadowMap
 from .lights import Light
 
@@ -831,3 +832,25 @@ class SimplePointcloudWithNormals(SimplePointcloud):
         gl.glDisableVertexAttribArray(3)
         self.shadowgen_shader.end()
         return True
+
+class AnimatablePointcloud(SimplePointcloud, DynamicTimedRenderable):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+	
+    def _finalize_init(self):
+        self.set_splat_size(0.5)
+        self.set_overlay_color(np.array([255, 0, 0, 255]))
+
+    def _set_sequence(self, params_seq):
+        self.params_sequence = params_seq
+        self.sequence_len = len(params_seq)
+
+    def _load_current_frame(self):
+        params = self.params_sequence[self.current_sequence_frame_ind]
+        vertices = params['vertices'] if 'vertices' in params else None
+        colors = params['colors'] if 'colors' in params else None
+        if vertices is not None:
+            pointcloud = self.PointcloudContainer(vertices, colors)
+            self.update_buffers(pointcloud)
+

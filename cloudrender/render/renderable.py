@@ -260,23 +260,23 @@ class DynamicRenderable(Renderable):
     def _unset_sequence(self):
         pass
 
-    def load_current_frame(self):
+    def load_current_frame(self, **kwargs):
         if self.loaded_frame_ind != self.current_sequence_frame_ind:
-            self._load_current_frame()
+            self._load_current_frame(**kwargs)
         self.loaded_frame_ind = self.current_sequence_frame_ind
 
-    def reload_current_frame(self):
-        self._load_current_frame()
+    def reload_current_frame(self, **kwargs):
+        self._load_current_frame(**kwargs)
         self.loaded_frame_ind = self.current_sequence_frame_ind
 
-    def _load_current_frame(self):
+    def _load_current_frame(self, **kwargs):
         pass
 
-    def reset_current_frame(self):
+    def reset_current_frame(self, **kwargs):
         self.current_sequence_frame_ind = 0
-        self.load_current_frame()
+        self.load_current_frame(**kwargs)
 
-    def set_current_frame(self, frame_index: int) -> bool:
+    def set_current_frame(self, frame_index: int, **kwargs) -> bool:
         """
         Set the current frame for the next draw cycle
         Args:
@@ -286,16 +286,16 @@ class DynamicRenderable(Renderable):
         """
         if self.sequence_initialized and frame_index>=0 and frame_index<self.sequence_len:
             self.current_sequence_frame_ind = frame_index
-            self.load_current_frame()
+            self.load_current_frame(**kwargs)
             return True
         else:
             return False
 
-    def next_frame(self):
-        return self.set_current_frame(self.current_sequence_frame_ind + 1)
+    def next_frame(self, **kwargs):
+        return self.set_current_frame(self.current_sequence_frame_ind + 1, **kwargs)
 
-    def prev_frame(self):
-        return self.set_current_frame(self.current_sequence_frame_ind - 1)
+    def prev_frame(self, **kwargs):
+        return self.set_current_frame(self.current_sequence_frame_ind - 1, **kwargs)
 
 
 class DynamicTimedRenderable(DynamicRenderable):
@@ -324,7 +324,12 @@ class DynamicTimedRenderable(DynamicRenderable):
         self.sequence_frame_times = None
         self.current_time = self.time_offset
 
-    def load_timed(self):
+    def load_timed(self, **kwargs):
+        """
+        Load the current frame based on the current time.
+        NOTE: This is a simple linear interpolation between frames.
+        NOTE: the `load_timed` method is visible only when `self.sequence_frame_times` is set.
+        """
         if self.sequence_len > 0 and self.sequence_frame_times is not None:
             times_diff = (self.current_time - self.sequence_frame_times)
             mask = times_diff >= 0
@@ -333,24 +338,24 @@ class DynamicTimedRenderable(DynamicRenderable):
             else:
                 masked_argmin = np.argmin(times_diff[mask])
                 index = np.arange(times_diff.shape[0])[mask][masked_argmin]
-            self.set_current_frame(index)
+            self.set_current_frame(index, **kwargs)
 
-    def set_time(self, time):
+    def set_time(self, time, **kwargs):
         self.current_time = time+self.time_offset
-        self.load_timed()
+        self.load_timed(**kwargs)
 
     def set_time_offset(self, offset):
         time_diff = offset-self.time_offset
         self.time_offset = offset
         self.advance_time(time_diff)
 
-    def advance_time(self, time_delta):
+    def advance_time(self, time_delta, **kwargs):
         self.current_time += time_delta
-        self.load_timed()
+        self.load_timed(**kwargs)
 
-    def reset_time(self):
+    def reset_time(self, **kwargs):
         self.current_time = self.time_offset
-        self.load_timed()
+        self.load_timed(**kwargs)
 
 
 
