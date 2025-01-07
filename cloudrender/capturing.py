@@ -2,8 +2,10 @@ import ctypes
 import numpy as np
 from OpenGL import GL as gl
 
+
 class DirectCapture:
     """A helper capturing class. Gets the color or depth data from the current FBO"""
+
     def __init__(self, resolution):
         self.resolution = resolution
 
@@ -16,7 +18,9 @@ class DirectCapture:
 
     def request_depth(self):
         width, height = self.resolution
-        depth_buf = gl.glReadPixels(0, 0, width, height, gl.GL_DEPTH_COMPONENT, gl.GL_FLOAT)
+        depth_buf = gl.glReadPixels(
+            0, 0, width, height, gl.GL_DEPTH_COMPONENT, gl.GL_FLOAT
+        )
         depth = np.frombuffer(depth_buf, np.float32).reshape(height, width)
         depth = depth[::-1].copy()
         return depth
@@ -40,6 +44,7 @@ class AsyncPBOCapture:
     """A helper capturing class. Gets the color from the current FBO.
     Submits the task to the OpenGL driver to be executed asynchronously.
     Doesn't wait on CPU<->GPU exchange which improves speed in most cases"""
+
     def __init__(self, resolution, queue_size):
         self.queue_size = queue_size
         self.resolution = resolution
@@ -51,8 +56,12 @@ class AsyncPBOCapture:
         pbos = gl.glGenBuffers(self.queue_size)
         for pbo in pbos:
             gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, pbo)
-            gl.glBufferData(gl.GL_PIXEL_PACK_BUFFER, (3 * self.resolution[0] * self.resolution[1]), None,
-                            gl.GL_STREAM_READ)
+            gl.glBufferData(
+                gl.GL_PIXEL_PACK_BUFFER,
+                (3 * self.resolution[0] * self.resolution[1]),
+                None,
+                gl.GL_STREAM_READ,
+            )
         gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, 0)
         self.pbos = pbos
 
@@ -72,13 +81,16 @@ class AsyncPBOCapture:
         self.delete_pbos()
 
     def get_first_requested_color(self):
+        # NOTE:bind the buffer at the strt of the queue from gl.GL_PIXEL_PACK_BUFFER, and move the queue start by 1.
         if self.qlen == 0:
             return None
         width, height = self.resolution
         pbo = self.pbos[self.qstart]
         gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, pbo)
         bufferdata = gl.glMapBuffer(gl.GL_PIXEL_PACK_BUFFER, gl.GL_READ_ONLY)
-        data = np.frombuffer(ctypes.string_at(bufferdata, (3 * width * height)), np.uint8).reshape(height, width, 3)
+        data = np.frombuffer(
+            ctypes.string_at(bufferdata, (3 * width * height)), np.uint8
+        ).reshape(height, width, 3)
         data = data[::-1].copy()
         gl.glUnmapBuffer(gl.GL_PIXEL_PACK_BUFFER)
         gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, 0)
@@ -90,9 +102,11 @@ class AsyncPBOCapture:
 
     @property
     def qend(self):
-        return (self.qstart+self.qlen) % self.queue_size
+        return (self.qstart + self.qlen) % self.queue_size
 
     def request_color_async(self):
+        # NOTE: read from the start of the queeue only if self.qlen >= self.queue_size, then put a frambuffer at the end of queue.
+        # NOTE: this is achieved by gl.glBindBuffer pbo, raeding pixels and bind the buffer 0.
         if self.qlen >= self.queue_size:
             res = self.get_first_requested_color()
         else:
@@ -104,5 +118,3 @@ class AsyncPBOCapture:
         gl.glReadPixels(0, 0, width, height, gl.GL_RGB, gl.GL_UNSIGNED_BYTE, 0)
         gl.glBindBuffer(gl.GL_PIXEL_PACK_BUFFER, 0)
         return res
-
-

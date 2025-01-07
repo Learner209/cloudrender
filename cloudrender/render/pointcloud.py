@@ -11,6 +11,7 @@ from OpenGL import GL as gl
 from .renderable import Renderable
 from .shaders.shader_loader import Shader
 from ..camera.models import BaseCameraModel, StandardProjectionCameraModel
+from .renderable import DynamicTimedRenderable
 from .shadowmap import ShadowMap
 from .lights import Light
 
@@ -135,11 +136,16 @@ class SimplePointcloud(Pointcloud):
         return self.context.splat_size
 
     def _upload_uniforms(self, shader_ids, lights=(), shadowmaps=()):
+        # NOTE: splat_size determines how large each individua point appears when rendered. It essentially controls the radius or diameter of each rendered point.
         gl.glUniform1f(shader_ids['splat_size'], self.context.splat_size)
         shadowmaps_enabled = np.zeros(self.SHADOWMAPS_MAX, dtype=np.int32)
         shadowmaps_enabled[:len(shadowmaps)] = 1
         M = self.context.Model
+        # NOTE: light_VP is the light's view-projection matrix, which transforms vertices from world space to light space.
+        # ! M is the model matrix, which transforms vertices from object space to world space.
         shadowmaps_lightMVP = [np.array(s.light_VP * M) for s in shadowmaps]
+        # NOTE: the overlay color is an RGBA color value that gets applied on top of the base PC colors, allowing for tinting or highlighting effects.
+        # the  `hsv_multiplier` is (hue, saturation, value) multiplier for the PC colors, allowing for color manipulation.
         shadowmaps_lightMVP = np.array(shadowmaps_lightMVP, dtype='f4')
         gl.glUniform4f(self.context.shader_ids['overlay_color'], *(self.overlay_color.astype(np.float32) / 255.))
         gl.glUniform3f(self.context.shader_ids['hsv_multiplier'], *self.hsv_multiplier)
@@ -826,3 +832,25 @@ class SimplePointcloudWithNormals(SimplePointcloud):
         gl.glDisableVertexAttribArray(3)
         self.shadowgen_shader.end()
         return True
+
+class AnimatablePointcloud(SimplePointcloud, DynamicTimedRenderable):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+	
+    def _finalize_init(self):
+        self.set_splat_size(0.5)
+        self.set_overlay_color(np.array([255, 0, 0, 255]))
+
+    def _set_sequence(self, params_seq):
+        self.params_sequence = params_seq
+        self.sequence_len = len(params_seq)
+
+    def _load_current_frame(self):
+        params = self.params_sequence[self.current_sequence_frame_ind]
+        vertices = params['vertices'] if 'vertices' in params else None
+        colors = params['colors'] if 'colors' in params else None
+        if vertices is not None:
+            pointcloud = self.PointcloudContainer(vertices, colors)
+            self.update_buffers(pointcloud)
+

@@ -40,20 +40,28 @@ class MeshNorms(Module):
 
     @staticmethod
     def compute_face2verts_normmap(faces: torch.Tensor):
-        _, faces_in_vertices_count = torch.unique(faces, sorted=True, return_counts=True)
+        """
+        return normmap: (verts_count, faces_in_vertex_max), where each entry is the index of the face in the verts.
+        """
+        _, faces_in_vertices_count = torch.unique(faces, sorted=True, return_counts=True) # count of verts occurences per vertex in faces.
         verts_count = len(faces_in_vertices_count)
-        faces_in_vertex_max = faces_in_vertices_count.max().item()
+        faces_in_vertex_max = faces_in_vertices_count.max().item() # max occurence of verts.
         faces_appearance = torch.argsort(faces.view(-1)) // 3
         appearance_array_off = 0
         # print(faces.size())
         normmap = torch.ones(verts_count, faces_in_vertex_max, dtype=torch.long, device=faces.device) * faces.size(0)
         for i in range(verts_count):
             faces_in_vertex = faces_in_vertices_count[i]
-            normmap[i, :faces_in_vertex] = faces_appearance[appearance_array_off:appearance_array_off + faces_in_vertex]
+            # NOTE: set normmap the indices of faces for each vert.
+            normmap[i, :faces_in_vertex] = faces_appearance[appearance_array_off:appearance_array_off + faces_in_vertex] 
             appearance_array_off += faces_in_vertex
         return normmap
 
     def faces_norms(self, verts: torch.Tensor):
+        """
+        Compute face normals from vertices, given the verts.
+        NOTE: compute two triangles from verts, and compute the cross product of the two vectors.
+        """
         verts_size = verts.size()
         verts_faces = verts[..., self.faces.view(-1), :].view(*verts_size[:-2], -1, 3, 3)
         vct1 = verts_faces[..., 0, :] - verts_faces[..., 1, :]
@@ -63,8 +71,11 @@ class MeshNorms(Module):
         return faces_norms
 
     def vertices_norms(self, verts: torch.Tensor):
+        """
+        """
         faces_norms = self.faces_norms(verts)
         faces_norms = torch.cat([faces_norms, torch.zeros(*faces_norms.size()[:-2], 1, 3, device=verts.device)], dim=-2)
+        # NOTE: aggregate faces norms for each vert. arrange them in the order of vertices.
         vertices_norms = faces_norms[..., self.normmap.view(-1), :].view(*faces_norms.size()[:-2], -1,
                                                                          self.normmap.size(1), 3).sum(dim=-2)
         vertices_norms = vertices_norms / torch.norm(vertices_norms, dim=-1, keepdim=True)

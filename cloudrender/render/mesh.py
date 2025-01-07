@@ -25,17 +25,24 @@ class Mesh(Renderable, ABC):
         texture: Optional[np.ndarray] = None
         face_uv_map: Optional[np.ndarray] = None  # face-wise UV map
 
-    def __init__(self, *args, draw_shadows: bool = True, generate_shadows: bool = True, **kwargs):
-        super().__init__(*args, draw_shadows=draw_shadows, generate_shadows=generate_shadows, **kwargs)
+    def __init__(
+        self, *args, draw_shadows: bool = True, generate_shadows: bool = True, **kwargs
+    ):
+        super().__init__(
+            *args,
+            draw_shadows=draw_shadows,
+            generate_shadows=generate_shadows,
+            **kwargs,
+        )
 
 
 class SimpleMesh(Mesh):
     @dataclass
     class MaterialProps:
-        ambient: float = 1.
-        diffuse: float = 0.
-        specular: float = 0.
-        shininess: float = 0.
+        ambient: float = 1.0
+        diffuse: float = 0.0
+        specular: float = 0.0
+        shininess: float = 0.0
 
     """
     Vertex-colored mesh with directional lighting support
@@ -51,55 +58,120 @@ class SimpleMesh(Mesh):
         dirname = os.path.dirname(os.path.abspath(__file__))
 
         if self.draw_shadows:
-            shader.initShaderFromGLSL([os.path.join(dirname, f"shaders/simple_mesh/shadowdraw/vertex_{camera_model}.glsl")],
-                                      [os.path.join(dirname, "shaders/simple_mesh/shadowdraw/fragment.glsl")])
-            self.context.shader_ids.update(self.locate_uniforms(self.shader, ['shadowmap_MVP', 'shadowmap_enabled',
-                                                                              'shadowmaps', 'shadow_color']))
+            shader.initShaderFromGLSL(
+                [
+                    os.path.join(
+                        dirname,
+                        f"shaders/simple_mesh/shadowdraw/vertex_{camera_model}.glsl",
+                    )
+                ],
+                [os.path.join(dirname, "shaders/simple_mesh/shadowdraw/fragment.glsl")],
+            )
+            self.context.shader_ids.update(
+                self.locate_uniforms(
+                    self.shader,
+                    [
+                        "shadowmap_MVP",
+                        "shadowmap_enabled",
+                        "shadowmaps",
+                        "shadow_color",
+                    ],
+                )
+            )
         else:
-            shader.initShaderFromGLSL([os.path.join(dirname, f"shaders/simple_mesh/vertex_{camera_model}.glsl")],
-                                      [os.path.join(dirname, "shaders/simple_mesh/fragment.glsl")])
-        self.context.shader_ids.update(self.locate_uniforms(self.shader, ['dirlight.direction', 'dirlight.intensity',
-                                                                          'specular', 'shininess',
-                                                                          'ambient', 'diffuse', 'overlay_color']))
+            shader.initShaderFromGLSL(
+                [
+                    os.path.join(
+                        dirname, f"shaders/simple_mesh/vertex_{camera_model}.glsl"
+                    )
+                ],
+                [os.path.join(dirname, "shaders/simple_mesh/fragment.glsl")],
+            )
+        self.context.shader_ids.update(
+            self.locate_uniforms(
+                self.shader,
+                [
+                    "dirlight.direction",
+                    "dirlight.intensity",
+                    "specular",
+                    "shininess",
+                    "ambient",
+                    "diffuse",
+                    "overlay_color",
+                ],
+            )
+        )
 
         if self.generate_shadows:
             self.shadowgen_shader = Shader()
-            self.shadowgen_shader.initShaderFromGLSL([
-                os.path.join(dirname, f"shaders/simple_mesh/shadowgen/vertex_perspective.glsl")],
-                [os.path.join(dirname, "shaders/simple_mesh/shadowgen/fragment.glsl")])
+            self.shadowgen_shader.initShaderFromGLSL(
+                [
+                    os.path.join(
+                        dirname,
+                        f"shaders/simple_mesh/shadowgen/vertex_perspective.glsl",
+                    )
+                ],
+                [os.path.join(dirname, "shaders/simple_mesh/shadowgen/fragment.glsl")],
+            )
 
     def _delete_buffers(self):
-        gl.glDeleteBuffers(3, [self.context.vertexbuffer, self.context.colorbuffer, self.context.normalbuffer])
+        gl.glDeleteBuffers(
+            3,
+            [
+                self.context.vertexbuffer,
+                self.context.colorbuffer,
+                self.context.normalbuffer,
+            ],
+        )
         gl.glDeleteVertexArrays(1, [self.context.vao])
 
-    def set_material(self, ambient=1., diffuse=0., specular=0., shininess=0.):
+    def set_material(self, ambient=1.0, diffuse=0.0, specular=0.0, shininess=0.0):
         self.material = self.MaterialProps(ambient, diffuse, specular, shininess)
 
     def set_overlay_color(self, color=(200, 200, 200, 0)):
         self.overlay_color = np.asarray(color, dtype=np.uint8)
 
     def _set_buffers(self, mesh: Union[Mesh.MeshContainer, trimesh.Trimesh]):
+        """
+        Set the buffers for the mesh. set mesh buffers pipeline: gl.glGenBuffers(), gl.glBindBuffer(), gl.glBufferData(), gl.glVertexAttribPointer(), gl.glEnableVertexAttribArray().
+        generate buffers, bind buffers to gl.GL_ARRAY_BUFFER, fill buffer with data, set up vertex attributes.
+        """
         faces = mesh.faces
-        glverts = np.copy(mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order='C')
+        glverts = np.copy(
+            mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order="C"
+        )
         if hasattr(mesh, "colors"):
-            glcolors = np.copy(mesh.colors.astype(np.float32)[faces.reshape(-1), :] / 255., order='C')
+            glcolors = np.copy(
+                mesh.colors.astype(np.float32)[faces.reshape(-1), :] / 255.0, order="C"
+            )
         else:
-            glcolors = np.copy(mesh.visual.vertex_colors.astype(np.float32)[faces.reshape(-1), :] / 255., order='C')
+            glcolors = np.copy(
+                mesh.visual.vertex_colors.astype(np.float32)[faces.reshape(-1), :]
+                / 255.0,
+                order="C",
+            )
         assert glcolors.shape[1] == 4
-        glnorms = np.copy(mesh.vertex_normals.astype(np.float32)[faces.reshape(-1), :], order='C')
+        glnorms = np.copy(
+            mesh.vertex_normals.astype(np.float32)[faces.reshape(-1), :], order="C"
+        )
 
         self.nglverts = len(glverts)
 
         self.context.vao = gl.glGenVertexArrays(1)
         gl.glBindVertexArray(self.context.vao)
 
+        # NOTE: GL_ARRAY_BUFFER is a gloabl binding target in opengl's state machine that reprs vert attr. Each `gl.glBindBuffer()` call makes `buffer` the active buffer..
+        # ! Only one buffer can be active per targert at a time.
+        # NOTE: gl.GL_DYNAMIC_DRAW is a performance hint that tells opengl that the buffer will be updated frequently.
         self.context.vertexbuffer = gl.glGenBuffers(1)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.vertexbuffer)
         gl.glBufferData(gl.GL_ARRAY_BUFFER, glverts.nbytes, glverts, gl.GL_DYNAMIC_DRAW)
 
         self.context.colorbuffer = gl.glGenBuffers(1)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.colorbuffer)
-        gl.glBufferData(gl.GL_ARRAY_BUFFER, glcolors.nbytes, glcolors, gl.GL_DYNAMIC_DRAW)
+        gl.glBufferData(
+            gl.GL_ARRAY_BUFFER, glcolors.nbytes, glcolors, gl.GL_DYNAMIC_DRAW
+        )
 
         self.context.normalbuffer = gl.glGenBuffers(1)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.normalbuffer)
@@ -107,31 +179,54 @@ class SimpleMesh(Mesh):
 
     def _update_buffers(self, mesh: Union[Mesh.MeshContainer, trimesh.Trimesh]):
         faces = mesh.faces
-        glverts = np.copy(mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order='C')
+        glverts = np.copy(
+            mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order="C"
+        )
         if hasattr(mesh, "colors"):
-            glcolors = np.copy(mesh.colors.astype(np.float32)[faces.reshape(-1), :] / 255., order='C')
+            glcolors = np.copy(
+                mesh.colors.astype(np.float32)[faces.reshape(-1), :] / 255.0, order="C"
+            )
         else:
-            glcolors = np.copy(mesh.visual.vertex_colors.astype(np.float32)[faces.reshape(-1), :] / 255., order='C')
+            glcolors = np.copy(
+                mesh.visual.vertex_colors.astype(np.float32)[faces.reshape(-1), :]
+                / 255.0,
+                order="C",
+            )
         assert glcolors.shape[1] == 4
-        glnorms = np.copy(mesh.vertex_normals.astype(np.float32)[faces.reshape(-1), :], order='C')
+        glnorms = np.copy(
+            mesh.vertex_normals.astype(np.float32)[faces.reshape(-1), :], order="C"
+        )
         gl.glBindVertexArray(self.context.vao)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.vertexbuffer)
         gl.glBufferData(gl.GL_ARRAY_BUFFER, glverts.nbytes, glverts, gl.GL_DYNAMIC_DRAW)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.colorbuffer)
-        gl.glBufferData(gl.GL_ARRAY_BUFFER, glcolors.nbytes, glcolors, gl.GL_DYNAMIC_DRAW)
+        gl.glBufferData(
+            gl.GL_ARRAY_BUFFER, glcolors.nbytes, glcolors, gl.GL_DYNAMIC_DRAW
+        )
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.normalbuffer)
         gl.glBufferData(gl.GL_ARRAY_BUFFER, glnorms.nbytes, glnorms, gl.GL_DYNAMIC_DRAW)
 
     def _upload_uniforms(self, shader_ids, lights=(), shadowmaps=()):
         shadowmaps_enabled = np.zeros(self.SHADOWMAPS_MAX, dtype=np.int32)
-        shadowmaps_enabled[:len(shadowmaps)] = 1
+        shadowmaps_enabled[: len(shadowmaps)] = 1
         M = self.context.Model
+        # NOTE: MVP(model-view-projection) matrix is used to transform vertices from object space to screen space.
+        # iIt's created by x 3 matrices: model matrix, view matrix, projection matrix.
         shadowmaps_lightMVP = [np.array(s.light_VP * M) for s in shadowmaps]
-        shadowmaps_lightMVP = np.array(shadowmaps_lightMVP, dtype='f4')
+        shadowmaps_lightMVP = np.array(shadowmaps_lightMVP, dtype="f4")
         if self.draw_shadows:
-            gl.glUniform1iv(self.context.shader_ids['shadowmap_enabled'], self.SHADOWMAPS_MAX, shadowmaps_enabled)
-            gl.glUniformMatrix4fv(self.context.shader_ids['shadowmap_MVP'], len(shadowmaps), gl.GL_TRUE, shadowmaps_lightMVP)
-            gl.glUniform4f(self.context.shader_ids['shadow_color'], *self.shadowcolor)
+            gl.glUniform1iv(
+                self.context.shader_ids["shadowmap_enabled"],
+                self.SHADOWMAPS_MAX,
+                shadowmaps_enabled,
+            )
+            gl.glUniformMatrix4fv(
+                self.context.shader_ids["shadowmap_MVP"],
+                len(shadowmaps),
+                gl.GL_TRUE,
+                shadowmaps_lightMVP,
+            )
+            gl.glUniform4f(self.context.shader_ids["shadow_color"], *self.shadowcolor)
             for shadow_ind, shadowmap in enumerate(shadowmaps):
                 gl.glActiveTexture(gl.GL_TEXTURE0 + shadow_ind)
                 gl.glBindTexture(gl.GL_TEXTURE_2D, shadowmap.texture)
@@ -143,15 +238,20 @@ class SimpleMesh(Mesh):
             # if no light is supplied, make the object fully ambient
             light = DirectionalLight(np.ones(3), np.ones(3))
             material = self.MaterialProps()
-        gl.glUniform3f(self.context.shader_ids['dirlight.direction'], *light.direction)
-        gl.glUniform3f(self.context.shader_ids['dirlight.intensity'], *light.intensity)
-        gl.glUniform1f(self.context.shader_ids['ambient'], material.ambient)
-        gl.glUniform1f(self.context.shader_ids['diffuse'], material.diffuse)
-        gl.glUniform1f(self.context.shader_ids['specular'], material.specular)
-        gl.glUniform1f(self.context.shader_ids['shininess'], material.shininess)
-        gl.glUniform4f(self.context.shader_ids['overlay_color'], *(self.overlay_color.astype(np.float32)/255.))
+        gl.glUniform3f(self.context.shader_ids["dirlight.direction"], *light.direction)
+        gl.glUniform3f(self.context.shader_ids["dirlight.intensity"], *light.intensity)
+        gl.glUniform1f(self.context.shader_ids["ambient"], material.ambient)
+        gl.glUniform1f(self.context.shader_ids["diffuse"], material.diffuse)
+        gl.glUniform1f(self.context.shader_ids["specular"], material.specular)
+        gl.glUniform1f(self.context.shader_ids["shininess"], material.shininess)
+        gl.glUniform4f(
+            self.context.shader_ids["overlay_color"],
+            *(self.overlay_color.astype(np.float32) / 255.0),
+        )
 
-    def _draw(self, reset: bool, lights: List[Light], shadowmaps: List[ShadowMap]) -> bool:
+    def _draw(
+        self, reset: bool, lights: List[Light], shadowmaps: List[ShadowMap]
+    ) -> bool:
         """
         Internal draw pass
         Args:
@@ -162,9 +262,14 @@ class SimpleMesh(Mesh):
         """
         if not reset:
             return False
+
         self.shader.begin()
         self.upload_uniforms(self.context.shader_ids, lights, shadowmaps)
 
+        # NOTE: gl.glEnableVertexAttribArray() enables the sending vertex data to shader attribute location n.
+        # ! gl.glVertexAttribPointer() sets up the vertex attribute pointer for the buffer bound to gl.GL_ARRAY_BUFFER, first arg (0,1,2) is the shader attr location.
+        # second arg(3,4,4) is the number of components per vertex attr. GL_FLOAT/GL_FALSE is the data_type and normalization flag.
+        # ! gl.glBindBuffer() binds the buffer to the target gl.GL_ARRAY_BUFFER.
         gl.glBindVertexArray(self.context.vao)
 
         gl.glEnableVertexAttribArray(0)
@@ -185,6 +290,7 @@ class SimpleMesh(Mesh):
         gl.glDisableVertexAttribArray(1)
         gl.glDisableVertexAttribArray(2)
         self.shader.end()
+
         return True
 
     def _draw_shadowmap(self, shadowmap_camera: StandardProjectionCameraModel) -> bool:
@@ -196,7 +302,15 @@ class SimpleMesh(Mesh):
             bool: if drawing buffer was changed (if something was actually drawn)
         """
         self.shadowgen_shader.begin()
-        self.upload_shadowgen_uniforms(shadowmap_camera, self.shadowgen_context.shader_ids)
+        self.upload_shadowgen_uniforms(
+            shadowmap_camera, self.shadowgen_context.shader_ids
+        )
+
+        # NOTE: gl.glBindVertexArray() binds the vertex array object to the current rendering context.
+        # ! VAO is a container for vertex attribute pointers, enabling efficient management of vertex data.
+        # ! It encapsulates the state of vertex attributes, including buffer bindings and attribute pointers.
+        # ! When a VAO is bound, the state associated with it is used for subsequent draw calls until another VAO is bound.
+        # ! This allows for efficient reuse of vertex data and attribute configurations across multiple draw calls.
 
         gl.glBindVertexArray(self.context.vao)
 
@@ -221,37 +335,94 @@ class TexturedMesh(SimpleMesh):
         dirname = os.path.dirname(os.path.abspath(__file__))
 
         if self.draw_shadows:
-            shader.initShaderFromGLSL([os.path.join(dirname, f"shaders/textured_mesh/shadowdraw/vertex_{camera_model}.glsl")],
-                                      [os.path.join(dirname, "shaders/textured_mesh/shadowdraw/fragment.glsl")])
-            self.context.shader_ids.update(self.locate_uniforms(self.shader, ['shadowmap_MVP', 'shadowmap_enabled',
-                                                                              'shadowmaps', 'shadow_color']))
+            shader.initShaderFromGLSL(
+                [
+                    os.path.join(
+                        dirname,
+                        f"shaders/textured_mesh/shadowdraw/vertex_{camera_model}.glsl",
+                    )
+                ],
+                [
+                    os.path.join(
+                        dirname, "shaders/textured_mesh/shadowdraw/fragment.glsl"
+                    )
+                ],
+            )
+            self.context.shader_ids.update(
+                self.locate_uniforms(
+                    self.shader,
+                    [
+                        "shadowmap_MVP",
+                        "shadowmap_enabled",
+                        "shadowmaps",
+                        "shadow_color",
+                    ],
+                )
+            )
         else:
-            shader.initShaderFromGLSL([os.path.join(dirname, f"shaders/textured_mesh/vertex_{camera_model}.glsl")],
-                                      [os.path.join(dirname, "shaders/textured_mesh/fragment.glsl")])
-        self.context.shader_ids.update(self.locate_uniforms(self.shader, ['dirlight.direction', 'dirlight.intensity',
-                                                                          'specular', 'shininess',
-                                                                          'ambient', 'diffuse', 'overlay_color']))
+            shader.initShaderFromGLSL(
+                [
+                    os.path.join(
+                        dirname, f"shaders/textured_mesh/vertex_{camera_model}.glsl"
+                    )
+                ],
+                [os.path.join(dirname, "shaders/textured_mesh/fragment.glsl")],
+            )
+        self.context.shader_ids.update(
+            self.locate_uniforms(
+                self.shader,
+                [
+                    "dirlight.direction",
+                    "dirlight.intensity",
+                    "specular",
+                    "shininess",
+                    "ambient",
+                    "diffuse",
+                    "overlay_color",
+                ],
+            )
+        )
 
         if self.generate_shadows:
             self.shadowgen_shader = Shader()
-            self.shadowgen_shader.initShaderFromGLSL([
-                os.path.join(dirname, f"shaders/simple_mesh/shadowgen/vertex_perspective.glsl")],
-                [os.path.join(dirname, "shaders/simple_mesh/shadowgen/fragment.glsl")])
+            self.shadowgen_shader.initShaderFromGLSL(
+                [
+                    os.path.join(
+                        dirname,
+                        f"shaders/simple_mesh/shadowgen/vertex_perspective.glsl",
+                    )
+                ],
+                [os.path.join(dirname, "shaders/simple_mesh/shadowgen/fragment.glsl")],
+            )
 
     def _delete_buffers(self):
-        gl.glDeleteBuffers(4, [self.context.vertexbuffer, self.context.uvbuffer, self.context.normalbuffer, self.context.texturebuffer])
+        gl.glDeleteBuffers(
+            4,
+            [
+                self.context.vertexbuffer,
+                self.context.uvbuffer,
+                self.context.normalbuffer,
+                self.context.texturebuffer,
+            ],
+        )
         gl.glDeleteVertexArrays(1, [self.context.vao])
 
     def _set_buffers(self, mesh: Union[Mesh.MeshContainer, trimesh.Trimesh]):
         faces = mesh.faces
-        glverts = np.copy(mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order='C')
+        glverts = np.copy(
+            mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order="C"
+        )
         if hasattr(mesh, "face_uv_map"):
-            gluvmap = np.copy(mesh.face_uv_map.astype(np.float32), order='C')
+            gluvmap = np.copy(mesh.face_uv_map.astype(np.float32), order="C")
         else:
             # Trimesh stores vertex-wise UV map
-            gluvmap = np.copy(mesh.visual.uv.astype(np.float32)[faces.reshape(-1), :], order='C')
+            gluvmap = np.copy(
+                mesh.visual.uv.astype(np.float32)[faces.reshape(-1), :], order="C"
+            )
         assert gluvmap.shape[1] == 2
-        glnorms = np.copy(mesh.vertex_normals.astype(np.float32)[faces.reshape(-1), :], order='C')
+        glnorms = np.copy(
+            mesh.vertex_normals.astype(np.float32)[faces.reshape(-1), :], order="C"
+        )
 
         self.nglverts = len(glverts)
 
@@ -273,57 +444,74 @@ class TexturedMesh(SimpleMesh):
         if hasattr(mesh, "texture"):
             texture_data = mesh.texture
         else:
-            texture_data = np.array(mesh.visual.image, order='C')
+            texture_data = np.array(mesh.visual.image, order="C")
 
         self.context.texturebuffer = gl.glGenTextures(1)
         gl.glBindTexture(gl.GL_TEXTURE_2D, self.context.texturebuffer)
 
         if not isinstance(texture_data, np.uint8):
-            texture_data = (texture_data * 255.).astype(np.uint8)
+            texture_data = (texture_data * 255.0).astype(np.uint8)
         # TODO: add support for the alpha channel
         # if texture_data.shape[2] == 3:
         #     texture_data = np.concatenate([texture_data, np.full(texture_data.shape[:2] + (1,), 255, dtype=np.uint8)], axis=2)
         texture_data = texture_data[:, :, :3]
         texture_data = 255 - texture_data[::-1, :, :]
-        gltexture = np.copy(texture_data.reshape(-1), order='C')
+        gltexture = np.copy(texture_data.reshape(-1), order="C")
         gl.glTexParameterf(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT)
         gl.glTexParameterf(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT)
         gl.glTexParameterf(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
         gl.glTexParameterf(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
         gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)
-        gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGB, texture_data.shape[1], texture_data.shape[0], 0, gl.GL_RGB, gl.GL_UNSIGNED_BYTE,
-                        gltexture)
+        gl.glTexImage2D(
+            gl.GL_TEXTURE_2D,
+            0,
+            gl.GL_RGB,
+            texture_data.shape[1],
+            texture_data.shape[0],
+            0,
+            gl.GL_RGB,
+            gl.GL_UNSIGNED_BYTE,
+            gltexture,
+        )
 
     def _update_buffers(self, mesh: Union[Mesh.MeshContainer, trimesh.Trimesh]):
         faces = mesh.faces
-        glverts = np.copy(mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order='C')
+        glverts = np.copy(
+            mesh.vertices.astype(np.float32)[faces.reshape(-1), :], order="C"
+        )
         gluvmap = None
         if hasattr(mesh, "face_uv_map"):
             if mesh.face_uv_map is not None:
-                gluvmap = np.copy(mesh.face_uv_map.astype(np.float32), order='C')
+                gluvmap = np.copy(mesh.face_uv_map.astype(np.float32), order="C")
         else:
             if mesh.visual is not None and mesh.visual.uv is not None:
                 # Trimesh stores vertex-wise UV map
-                gluvmap = np.copy(mesh.visual.uv.astype(np.float32)[faces.reshape(-1), :], order='C')
-        glnorms = np.copy(mesh.vertex_normals.astype(np.float32)[faces.reshape(-1), :], order='C')
+                gluvmap = np.copy(
+                    mesh.visual.uv.astype(np.float32)[faces.reshape(-1), :], order="C"
+                )
+        glnorms = np.copy(
+            mesh.vertex_normals.astype(np.float32)[faces.reshape(-1), :], order="C"
+        )
         gl.glBindVertexArray(self.context.vao)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.vertexbuffer)
         gl.glBufferData(gl.GL_ARRAY_BUFFER, glverts.nbytes, glverts, gl.GL_DYNAMIC_DRAW)
         if gluvmap is not None:
             assert gluvmap.shape[1] == 2
             gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.uvbuffer)
-            gl.glBufferData(gl.GL_ARRAY_BUFFER, gluvmap.nbytes, gluvmap, gl.GL_DYNAMIC_DRAW)
+            gl.glBufferData(
+                gl.GL_ARRAY_BUFFER, gluvmap.nbytes, gluvmap, gl.GL_DYNAMIC_DRAW
+            )
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.context.normalbuffer)
         gl.glBufferData(gl.GL_ARRAY_BUFFER, glnorms.nbytes, glnorms, gl.GL_DYNAMIC_DRAW)
 
         if hasattr(mesh, "texture"):
             texture_data = mesh.texture
         else:
-            texture_data = np.array(mesh.visual.image, order='C')
+            texture_data = np.array(mesh.visual.image, order="C")
         if texture_data is not None:
             gl.glBindTexture(gl.GL_TEXTURE_2D, self.context.texturebuffer)
             if not isinstance(texture_data, np.uint8):
-                texture_data = (texture_data * 255.).astype(np.uint8)
+                texture_data = (texture_data * 255.0).astype(np.uint8)
             # if texture_data.shape[2] == 3:
             #     texture_data = np.concatenate([texture_data, np.full(texture_data.shape[:2] + (1,), 255, dtype=np.uint8)], axis=2)
             gl.glTexParameterf(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT)
@@ -332,11 +520,22 @@ class TexturedMesh(SimpleMesh):
             gl.glTexParameterf(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
             texture_data = texture_data[:, :, :3]
             texture_data = 255 - texture_data[::-1, :, :]
-            gltexture = np.copy(texture_data.reshape(-1), order='C')
-            gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGB, texture_data.shape[1], texture_data.shape[0], 0, gl.GL_RGB, gl.GL_UNSIGNED_BYTE,
-                            gltexture)
+            gltexture = np.copy(texture_data.reshape(-1), order="C")
+            gl.glTexImage2D(
+                gl.GL_TEXTURE_2D,
+                0,
+                gl.GL_RGB,
+                texture_data.shape[1],
+                texture_data.shape[0],
+                0,
+                gl.GL_RGB,
+                gl.GL_UNSIGNED_BYTE,
+                gltexture,
+            )
 
-    def _draw(self, reset: bool, lights: List[Light], shadowmaps: List[ShadowMap]) -> bool:
+    def _draw(
+        self, reset: bool, lights: List[Light], shadowmaps: List[ShadowMap]
+    ) -> bool:
         """
         Internal draw pass
         Args:

@@ -23,6 +23,12 @@ class BaseCameraModel(ABC):
         self.world2cam = False
 
     def init_extrinsics(self, quat=None, pose=None, world2cam=False):
+        """
+        Args:
+            quat (np.ndarray): quaternion, shape (4,), in (wxyz) order
+            pose (np.ndarray): translation, shape (3,)
+            world2cam (bool): if True, the transformation is from world to camera, otherwise from camera to world
+        """
         quat = self.quat if quat is None else quat
         pose = self.pose if pose is None else pose
         self.quat = quat
@@ -69,6 +75,20 @@ class BaseCameraModel(ABC):
 
 
 class OcamCameraModel(BaseCameraModel):
+    """
+    The OCam Camera Model is a mathematical framework used to describe the imaging process of omnidirectional cameras, which include both catadioptric (camera + mirror) and dioptric (fisheye) systems. It was developed by Davide Scaramuzza and is widely used for calibrating and modeling cameras with large fields of view (FOV), often exceeding 180 degrees. The model uses Taylor polynomials to approximate the relationship between 3D points in the world and their corresponding 2D image coordinate
+    Distortion Handling:
+
+    Pinhole Model: Assumes no distortion and uses a linear projection model.
+
+    OCam Model: Uses polynomials to model non-linear distortions caused by fisheye lenses or mirrors. This allows it to accurately represent the mapping between 3D points and their distorted 2D projections17.
+
+    Field of View (FOV):
+
+    Pinhole Model: Limited to a narrow FOV (typically less than 90 degrees).
+
+    OCam Model: Can handle wide FOVs (up to 360 degrees), making it suitable for omnidirectional cameras
+    """
     uniforms_names = BaseCameraModel.uniforms_names + ['ocam_invpol', 'ocam_affine', 'ocam_center_off',
                                                        'ocam_theta_thresh', 'far', 'width_mul']
 

@@ -10,8 +10,16 @@ def printOpenGLError():
 
 # sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 class Shader(object):
-
+    """
+    Shader class for rendering.
+    Vertex shaders; process individual verts, handle verts attrs and transformations..
+    Fragment shaders: process framents/pixels, determine final color output.
+    Geometry shaders: process primitives, somewhat between vertex and fragment shaders, can modify geometry.
+    """
     def initShaderFromGLSL(self, vertex_shader_paths, fragment_shader_paths, geometry_shader_paths = None):
+        """
+        Initialize the shader program from GLSL files.
+        """
         vertex_shader_source_list = []
         fragment_shader_source_list = []
         geometry_shader_source_list = []
@@ -36,6 +44,10 @@ class Shader(object):
             self.initShader(vertex_shader_source_list, fragment_shader_source_list, geometry_shader_source_list)
 
     def initShader(self, vertex_shader_source_list, fragment_shader_source_list, geometry_shader_source_list):
+        """
+        Initialize the shader program, shader loading pipeline: gl.glCreateProgram(), gl.glCreateShader(), gl.glShaderSource(), gl.glCompileShader(), gl.glAttachShader(), gl.glLinkProgram().
+        create program,create shader, compiile shader, attach shader to the current program.
+        """
         # create program
         self.program = gl.glCreateProgram()  # pylint: disable=E1111
         # print('create program ',self.program)
