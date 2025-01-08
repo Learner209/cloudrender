@@ -21,6 +21,7 @@ from egoallo import training_utils
 from pathlib import Path
 from typing import Optional
 from egoallo.transforms import SO3, SE3
+from egoallo import fncsmpl
 import torch
 logger = logging.getLogger("main_script")
 logger.setLevel(logging.INFO)
@@ -104,6 +105,7 @@ class HPSPathManipulator:
 paths = HPSPathManipulator(base_dir="/home/minghao/src/robotflow/egoallo/datasets/HPS",
                            assets_dir="/home/minghao/src/robotflow/egoallo/assets")
 
+body_model = fncsmpl.SmplhModel.load(Path("/home/minghao/src/robotflow/egoallo/assets/smpl_based_model/smplh/male/model.npz"))
 # First, let's set the target resolution, framerate, video length and initialize OpenGL context.
 # We will use EGL offscreen rendering for that, but you can change it to whatever context you prefer (e.g. OsMesa, X-Server)
 resolution = (1280,720)
@@ -111,6 +113,7 @@ fps = 30.
 
 logger.info("Initializing EGL and OpenGL")
 context = EGLContext()
+breakpoint()
 if not context.initialize(*resolution):
     print("Error during context initialization")
     sys.exit(0)
@@ -194,9 +197,9 @@ renderable_smpl.set_sequence(motion_seq, default_frame_time=1/fps)
 renderable_smpl.set_material(0.3,1,0,0)
 main_scene.add_object(renderable_smpl)
 # Debug kpts that runs fk on self-cusotmized smpl model.
-debug_renderable_keypoint = AnimatablePointcloud(camera=camera)
-debug_renderable_keypoint.generate_shadows = False
-debug_renderable_keypoint.init_context()
+renderable_keypoint = AnimatablePointcloud(camera=camera)
+renderable_keypoint.generate_shadows = False
+renderable_keypoint.init_context()
 
 # Generate 30 keypoints around each translation point
 num_keypoints = 30
@@ -259,7 +262,7 @@ with VideoWriter("test_assets/output_1.mp4", resolution=resolution, fps=fps) as 
         if cnt > 3000:
             break
         # Update dynamic objects
-        renderable_smpl.set_time(current_time)
+        renderable_smpl.set_time(current_time, body_model=body_model)
         current_smpl_params = renderable_smpl.params_sequence[renderable_smpl.current_sequence_frame_ind]
         cur_smpl_trans, cur_smpl_shape, cur_smpl_pose = current_smpl_params['translation'], current_smpl_params['shape'], current_smpl_params['pose']
         

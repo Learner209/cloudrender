@@ -42,7 +42,7 @@ class SimplePointcloud(Pointcloud):
         Args:
             camera (BaseCameraModel): main camera
             shadowmaps (List[ShadowMap]): list of shadowmaps (no more than Renderable.SHADOWMAPS_MAX)
-            additional_lights: list of lights
+            additional_lihts: list of lights
             indexing_offset: if not None, will render additional index map: each pixel has a projected vertex index.
                 Index is computed as (vertex_id + indexing_offset)
         """
@@ -89,6 +89,7 @@ class SimplePointcloud(Pointcloud):
         glverts = np.copy(pointcloud.vertices.astype(np.float32), order='C')
         glcolors = np.copy(pointcloud.colors.astype(np.float32) / 255., order='C')
         assert len(glverts) == len(glcolors), "PC vertices and colors length should match"
+        # breakpoint()
 
         self.nglverts = len(glverts)
 
