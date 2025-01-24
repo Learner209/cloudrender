@@ -113,7 +113,7 @@ fps = 30.
 
 logger.info("Initializing EGL and OpenGL")
 context = EGLContext()
-breakpoint()
+
 if not context.initialize(*resolution):
     print("Error during context initialization")
     sys.exit(0)
@@ -181,7 +181,7 @@ main_scene.add_object(renderable_pc)
 logger.info("Loading SMPL animation")
 renderable_smpl = AnimatableSMPLModel(
     camera=camera, 
-    gender="male",
+    gender="neutral",
     smpl_root=str(paths.get_smpl_model_path())
 )
 renderable_smpl.draw_shadows = False
@@ -292,7 +292,7 @@ with VideoWriter("test_assets/output_1.mp4", resolution=resolution, fps=fps) as 
         look_dir = look_dir / torch.norm(look_dir)
         
         # Calculate up vector (always pointing up in z direction)
-        up = torch.tensor([0.0, 0.0, 1.0], dtype=torch.float64)
+        up = torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32)
         
         # Calculate right vector
         right = torch.cross(look_dir, up, dim=-1)

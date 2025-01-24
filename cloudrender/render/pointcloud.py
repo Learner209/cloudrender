@@ -89,7 +89,7 @@ class SimplePointcloud(Pointcloud):
         glverts = np.copy(pointcloud.vertices.astype(np.float32), order='C')
         glcolors = np.copy(pointcloud.colors.astype(np.float32) / 255., order='C')
         assert len(glverts) == len(glcolors), "PC vertices and colors length should match"
-        # breakpoint()
+        
 
         self.nglverts = len(glverts)
 
@@ -838,10 +838,14 @@ class AnimatablePointcloud(SimplePointcloud, DynamicTimedRenderable):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-	
-    def _finalize_init(self):
+    
+    def _finalize_init(self, overlay_color: np.ndarray = None):
         self.set_splat_size(0.5)
-        self.set_overlay_color(np.array([255, 0, 0, 255]))
+        self.set_overlay_color(np.array([200, 200, 200, 128]))
+        # self.set_overlay_color(np.array([255, 0, 0, 0]))
+
+    # def _set_overlay_color(self, overlay_color: np.ndarray):
+    #     self.set_overlay_color(overlay_color)
 
     def _set_sequence(self, params_seq):
         self.params_sequence = params_seq

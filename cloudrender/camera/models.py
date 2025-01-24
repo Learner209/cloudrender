@@ -120,10 +120,10 @@ class OcamCameraModel(BaseCameraModel):
         self.context.width_mul = ocam_img_size[1] / ocam_img_size[0]
 
     def upload_intrinsics(self, shader_ids):
-        gl.glUniform1dv(shader_ids['ocam_invpol'], 18, self.context.ocam_invpol.astype(np.float64).copy())
-        gl.glUniform3dv(shader_ids['ocam_affine'], 1, self.context.ocam_affine.astype(np.float64).copy())
+        gl.glUniform1dv(shader_ids['ocam_invpol'], 18, self.context.ocam_invpol.astype(np.float32).copy())
+        gl.glUniform3dv(shader_ids['ocam_affine'], 1, self.context.ocam_affine.astype(np.float32).copy())
         gl.glUniform2dv(shader_ids['ocam_center_off'], 1,
-                        self.context.ocam_center_off.astype(np.float64).copy())
+                        self.context.ocam_center_off.astype(np.float32).copy())
         gl.glUniform1f(shader_ids['ocam_theta_thresh'], float(self.context.ocam_theta_thresh))
         gl.glUniform1f(shader_ids['far'], float(self.context.far))
         gl.glUniform1f(shader_ids['width_mul'], self.context.width_mul)

@@ -99,7 +99,7 @@ class SMPLModel(SimpleMesh):
         assert body_model is not None, "body_model must be provided"
         # TODO: the `fncsmpl.SmplhModel` is not compatible with the smplx.create impl, they maintain a constant offset between each other.
         # TODO: investigate this issues if you have time.
-        # breakpoint()
+        
         self.update_params(pose_params, shape_params, translation_params)
         batch_pose_params = self.pose_params.unsqueeze(0) # [1, 66]
         batch_shape_params = self.shape_params.unsqueeze(0) # [1, 10]
