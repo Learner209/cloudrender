@@ -1,6 +1,6 @@
 import numpy as np
 from OpenGL import GL as gl
-from typing import List, Sequence
+from typing import Sequence
 from ..camera.models import StandardProjectionCameraModel
 
 class ShadowMap():

@@ -21,7 +21,7 @@ from egoallo import training_utils
 from pathlib import Path
 from typing import Optional
 from egoallo.transforms import SO3, SE3
-from egoallo import fncsmpl
+from egoallo import fncsmpl_library as fncsmpl
 import torch
 logger = logging.getLogger("main_script")
 logger.setLevel(logging.INFO)

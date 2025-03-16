@@ -1,15 +1,8 @@
-import numpy as np
-import torch
-from torch.nn import Module
-import smplx
-from loguru import logger
-from typing import Dict, List
 
-from .mesh import TexturedMesh, SimpleMesh, Mesh
+from .mesh import SimpleMesh
 from .pointcloud import SimplePointcloud
 from .renderable import DynamicTimedRenderable
-from .utils import MeshNorms, centrify_smplx_root_joint
-from ..utils import get_closest_ind_after, get_closest_ind_before, ObjectTrajectory
+from ..utils import ObjectTrajectory
 
 
 

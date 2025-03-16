@@ -3,7 +3,6 @@ import logging
 from typing import Sequence
 from scipy.spatial.transform import Rotation, Slerp
 from scipy.interpolate import interp1d
-from scipy.interpolate import splev, splrep
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal.windows import gaussian
 

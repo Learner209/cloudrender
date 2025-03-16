@@ -30,7 +30,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os, sys
+import os
+import sys
 # if OpenGL was already loaded, we have to reload it after the
 # PYOPENGL_PLATFORM variable is set...
 ogl_module_names = list(k for k in sys.modules.keys() if k.startswith('OpenGL'))

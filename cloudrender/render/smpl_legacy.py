@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import smplx
 
-from egoallo import fncsmpl
+from egoallo import fncsmpl_library as fncsmpl
 
 from .mesh import SimpleMesh
 from .renderable import DynamicTimedRenderable
@@ -52,7 +52,7 @@ class SMPLModel(SimpleMesh):
                                                            device=self.device)
         self.normals_layer = MeshNorms(self.model_layer.faces_tensor) #torch.tensor(self.model_layer.faces.astype(int), dtype=torch.long, device=self.device))
         self.gender = gender
-        self.shape_params = torch.zeros(10, device=self.device) if shape_params is None else \
+        self.shape_params = torch.zeros(16, device=self.device) if shape_params is None else \
             torch.tensor(shape_params, dtype=torch.float32, device=self.device)
 
     def _preprocess_param(self, param):
@@ -97,8 +97,6 @@ class SMPLModel(SimpleMesh):
     
     def get_smpl_fncsmpl(self, pose_params=None, shape_params=None, translation_params=None, body_model: fncsmpl.SmplhModel = None):
         assert body_model is not None, "body_model must be provided"
-        # TODO: the `fncsmpl.SmplhModel` is not compatible with the smplx.create impl, they maintain a constant offset between each other.
-        # TODO: investigate this issues if you have time.
         
         self.update_params(pose_params, shape_params, translation_params)
         batch_pose_params = self.pose_params.unsqueeze(0) # [1, 66]

@@ -1,13 +1,11 @@
 import numpy as np
 import torch
-from torch.nn import Module
 import smplx
-from loguru import logger
 from typing import Dict
 
 from .mesh import TexturedMesh, SimpleMesh, Mesh
 from .renderable import DynamicTimedRenderable
-from .utils import MeshNorms, centrify_smplx_root_joint
+from .utils import MeshNorms
 
 
 class SMPLXModelBase(DynamicTimedRenderable):
